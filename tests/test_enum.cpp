@@ -81,7 +81,7 @@ test_initializer enums([](py::module &m) {
 #if PY_VERSION_HEX >= 0x03000000
     py::py3_enum<Py3EnumEmpty>(m, "Py3EnumEmpty");
 
-    auto e = py::py3_enum<Py3Enum>(m, "Py3Enum")
+    auto e = py::py3_enum<Py3Enum>(m, "Py3Enum", py::arithmetic())
         .value("A", Py3Enum::A)
         .value("B", Py3Enum::B)
         .value("C", Py3Enum::C)

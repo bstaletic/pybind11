@@ -1295,13 +1295,16 @@ private:
 template<typename T>
 class py3_enum : public detail::class_interface<py3_enum<T>, T> {
 public:
+    using detail::class_interface<py3_enum<T>, T>::def;
     using underlying_type = typename std::underlying_type<T>::type;
 
-    py3_enum(handle scope, const char* name)
+    template <typename... Extra>
+    py3_enum(handle scope, const char* name, const Extra&...)
     : name(name),
       scope(scope),
       ctor(module::import("enum").attr("IntEnum")),
       unique(module::import("enum").attr("unique")) {
+        constexpr bool is_arithmetic = detail::any_of<std::is_same<arithmetic, Extra>...>::value;
         kwargs["value"] = cast(name);
         kwargs["names"] = entries;
         if (scope) {
@@ -1314,7 +1317,9 @@ public:
                 kwargs["qualname"] = scope.attr("__qualname__").cast<std::string>() + "." + name;
 #endif
         }
+        //kwargs["__eq__"] = [](const T &value, T *value2) { return value2 && value == *value2; };
         update();
+        //def("__eq__", [](const T &value, T *value2) { return value2 && value == *value2; });
     }
 
     /// Add an enumeration entry
