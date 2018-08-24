@@ -138,7 +138,7 @@ void vector_modifiers(enable_if_t<is_copy_constructible<typename Vector::value_t
 
     cl.def("extend",
        [](Vector &v, const iterable &py_src) {
-           const size_t old_size = v.size();
+           const DiffType old_size = v.size();
            v.reserve(v.size() + (hasattr(py_src, "__len__")? len(py_src) : 0));
            try {
                    for (const handle& src_element : py_src) {
