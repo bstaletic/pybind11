@@ -33,6 +33,15 @@ def test_vector_int():
     del v_int2[0]
     assert v_int2 == m.VectorInt([0, 99, 2, 3])
 
+    v_int3 = m.VectorInt()
+    v_int3.extend([1, 2, 3])
+    assert v_int3 == m.VectorInt([1, 2, 3])
+    v_int3.extend(x for x in range(4, 5))
+    assert v_int3 == m.VectorInt([1, 2, 3, 4])
+    with pytest.raises(RuntimeError):
+      v_int3.extend([123,'foo'])
+    assert v_int3 == m.VectorInt([1, 2, 3, 4])
+
 
 # related to the PyPy's buffer protocol.
 @pytest.unsupported_on_pypy

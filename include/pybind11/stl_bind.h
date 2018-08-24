@@ -136,6 +136,26 @@ void vector_modifiers(enable_if_t<is_copy_constructible<typename Vector::value_t
        "Extend the list by appending all the items in the given list"
     );
 
+    cl.def("extend",
+       [](Vector &v, const iterable &py_src) {
+           const size_t old_size = v.size();
+           v.reserve(v.size() + (hasattr(py_src, "__len__")? len(py_src) : 0));
+           try {
+                   for (const handle& src_element : py_src) {
+                       v.push_back(src_element.cast<T>());
+                   }
+           } catch (const cast_error &) {
+               v.erase(v.begin() + old_size, v.end());
+               v.shrink_to_fit();
+               throw;
+           }
+       },
+       arg("L"),
+       "Extend the list by appending all the items in the given python list\n\n"
+       "The elements of the python list need to be"
+       " of appropriate type for the C++ vector"
+    );
+
     cl.def("insert",
         [](Vector &v, SizeType i, const T &x) {
             if (i > v.size())
