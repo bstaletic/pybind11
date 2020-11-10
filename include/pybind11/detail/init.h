@@ -234,7 +234,7 @@ struct factory<Func, void_type (*)(), Return(Args...)> {
         auto &func = class_factory;
         cl.def("__init__", [func]
         #endif
-        (value_and_holder &v_h, Args... args) {
+        (value_and_holder &v_h, Args&&... args) {
             construct<Class>(v_h, func(std::forward<Args>(args)...),
                              Py_TYPE(v_h.inst) != v_h.type->type);
         }, is_new_style_constructor(), extra...);
@@ -324,7 +324,7 @@ struct pickle_factory<Get, Set, RetState(Self), NewInstance(ArgState)> {
         auto &func = set;
         cl.def("__setstate__", [func]
 #endif
-        (value_and_holder &v_h, ArgState state) {
+        (value_and_holder &v_h, ArgState&& state) {
             setstate<Class>(v_h, func(std::forward<ArgState>(state)),
                             Py_TYPE(v_h.inst) != v_h.type->type);
         }, is_new_style_constructor(), extra...);
