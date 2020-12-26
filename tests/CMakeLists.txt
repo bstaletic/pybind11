@@ -389,6 +389,7 @@ set(PYBIND11_TEST_PREFIX_COMMAND
 add_custom_target(
   pytest
   COMMAND ${PYBIND11_TEST_PREFIX_COMMAND} ${PYTHON_EXECUTABLE} -m pytest
+          --cov=pybind11
           ${PYBIND11_ABS_PYTEST_FILES}
   DEPENDS ${test_targets}
   WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
