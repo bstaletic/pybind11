@@ -116,7 +116,7 @@ jobs:
       run: cmake --build . --target test_cmake_build
 
     - name: codecov
-      run: CODECOV_TOKEN=${{ secrets.CODECOV_TOKEN }} codecov --name testing_testing_one_two_3
+      run: CODECOV_TOKEN=${{ secrets.CODECOV_TOKEN }} codecov --name ${{ matrix.python }}-${{ matrix.runs-on }}-${{ matrix.args }}
 
     - name: Clean directory
       run: git clean -fdx
