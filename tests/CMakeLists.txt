@@ -16,6 +16,9 @@ else()
   cmake_policy(VERSION 3.18)
 endif()
 
+if (MSVC)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
+endif()
 # Only needed for CMake < 3.5 support
 include(CMakeParseArguments)
 
