@@ -16,7 +16,7 @@ else()
   cmake_policy(VERSION 3.18)
 endif()
 
-if (MSVC)
+if(MSVC)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
 endif()
 # Only needed for CMake < 3.5 support
@@ -391,8 +391,7 @@ set(PYBIND11_TEST_PREFIX_COMMAND
 # A single command to compile and run the tests
 add_custom_target(
   pytest
-  COMMAND ${PYBIND11_TEST_PREFIX_COMMAND} ${PYTHON_EXECUTABLE} -m pytest
-          --cov=pybind11
+  COMMAND ${PYBIND11_TEST_PREFIX_COMMAND} ${PYTHON_EXECUTABLE} -m pytest --cov=pybind11
           ${PYBIND11_ABS_PYTEST_FILES}
   DEPENDS ${test_targets}
   WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
