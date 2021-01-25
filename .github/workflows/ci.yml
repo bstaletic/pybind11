@@ -98,7 +98,6 @@ jobs:
         -DPYBIND11_WERROR=ON
         -DDOWNLOAD_CATCH=ON
         -DDOWNLOAD_EIGEN=ON
-        -DPYBIND11_TEST_COVERAGE=ON
         -DCMAKE_CXX_STANDARD=11
         ${{ matrix.args }}
 
@@ -116,9 +115,6 @@ jobs:
     - name: Interface test C++11
       run: cmake --build . --target test_cmake_build
 
-    - name: Upload to Codecov
-      run: codecov --token "${{ secrets.CODECOV_TOKEN }}" --name "${{ matrix.python }}-${{ matrix.runs-on }}-${{ matrix.args }}"
-
     - name: Clean directory
       run: git clean -fdx
 
@@ -129,6 +125,7 @@ jobs:
         -DPYBIND11_WERROR=ON
         -DDOWNLOAD_CATCH=ON
         -DDOWNLOAD_EIGEN=ON
+        -DPYBIND11_TEST_COVERAGE=ON
         -DCMAKE_CXX_STANDARD=17
         ${{ matrix.args }}
         ${{ matrix.args2 }}
@@ -138,6 +135,9 @@ jobs:
 
     - name: Python tests
       run: cmake --build build2 --target pytest
+
+    - name: Upload to Codecov
+      run: codecov --token "${{ secrets.CODECOV_TOKEN }}" --name "${{ matrix.python }}-${{ matrix.runs-on }}-${{ matrix.args }}"
 
     - name: C++ tests
       # TODO: Figure out how to load the DLL on Python 3.8+
