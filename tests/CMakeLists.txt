@@ -16,6 +16,9 @@ else()
   cmake_policy(VERSION 3.18)
 endif()
 
+if(MSVC)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
+endif()
 # Only needed for CMake < 3.5 support
 include(CMakeParseArguments)
 
@@ -308,6 +311,10 @@ if(PYBIND11_CUDA_TESTS)
   set_property(SOURCE ${PYBIND11_TEST_FILES} PROPERTY LANGUAGE CUDA)
 endif()
 
+set(PYBIND11_TEST_COVERAGE
+    OFF
+    CACHE BOOL "Collect test coverage for C++ and Python")
+
 foreach(target ${test_targets})
   set(test_files ${PYBIND11_TEST_FILES})
   if(NOT "${target}" STREQUAL "pybind11_tests")
@@ -349,6 +356,11 @@ foreach(target ${test_targets})
     target_compile_definitions(${target} PRIVATE -DPYBIND11_TEST_BOOST)
   endif()
 
+  if(PYBIND11_TEST_COVERAGE AND NOT MSVC)
+    target_compile_options(${target} PRIVATE -coverage)
+    target_link_libraries(${target} PRIVATE -coverage)
+  endif()
+
   # Always write the output file directly into the 'tests' directory (even on MSVC)
   if(NOT CMAKE_LIBRARY_OUTPUT_DIRECTORY)
     set_target_properties(${target} PROPERTIES LIBRARY_OUTPUT_DIRECTORY
@@ -385,11 +397,17 @@ set(PYBIND11_TEST_PREFIX_COMMAND
     ""
     CACHE STRING "Put this before pytest, use for checkers and such")
 
+if(PYBIND11_TEST_COVERAGE)
+  set(PYBIND11_PYTEST_EXTRA_FLAGS "--cov=pybind11")
+else()
+  set(PYBIND11_PYTEST_EXTRA_FLAGS "")
+endif()
+
 # A single command to compile and run the tests
 add_custom_target(
   pytest
   COMMAND ${PYBIND11_TEST_PREFIX_COMMAND} ${PYTHON_EXECUTABLE} -m pytest
-          ${PYBIND11_ABS_PYTEST_FILES}
+          ${PYBIND11_PYTEST_EXTRA_FLAGS} ${PYBIND11_ABS_PYTEST_FILES}
   DEPENDS ${test_targets}
   WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
   USES_TERMINAL)
