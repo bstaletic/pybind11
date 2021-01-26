@@ -125,6 +125,7 @@ jobs:
         -DPYBIND11_WERROR=ON
         -DDOWNLOAD_CATCH=ON
         -DDOWNLOAD_EIGEN=ON
+        -DCMAKE_BUILD_TYPE=Debug
         -DPYBIND11_TEST_COVERAGE=ON
         -DCMAKE_CXX_STANDARD=17
         ${{ matrix.args }}
