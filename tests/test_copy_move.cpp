@@ -34,11 +34,10 @@ struct lacking_move_ctor : public empty<lacking_move_ctor> {
 template <> lacking_move_ctor empty<lacking_move_ctor>::instance_ = {};
 
 /* Custom type caster move/copy test classes */
-class MoveOnlyInt {
-public:
-    MoveOnlyInt() { print_default_created(this); }
-    MoveOnlyInt(int v) : value{std::move(v)} { print_created(this, value); }
-    MoveOnlyInt(MoveOnlyInt &&m) { print_move_created(this, m.value); std::swap(value, m.value); }
+struct MoveOnlyInt {
+    MoveOnlyInt() : value{42} { print_default_created(this); }
+    MoveOnlyInt(int v) : value{v} { print_created(this, value); }
+    MoveOnlyInt(MoveOnlyInt &&m) : value{-1} { print_move_created(this, m.value); std::swap(value, m.value); }
     MoveOnlyInt &operator=(MoveOnlyInt &&m) { print_move_assigned(this, m.value); std::swap(value, m.value); return *this; }
     MoveOnlyInt(const MoveOnlyInt &) = delete;
     MoveOnlyInt &operator=(const MoveOnlyInt &) = delete;
@@ -46,11 +45,10 @@ public:
 
     int value;
 };
-class MoveOrCopyInt {
-public:
-    MoveOrCopyInt() { print_default_created(this); }
-    MoveOrCopyInt(int v) : value{std::move(v)} { print_created(this, value); }
-    MoveOrCopyInt(MoveOrCopyInt &&m) { print_move_created(this, m.value); std::swap(value, m.value); }
+struct MoveOrCopyInt {
+    MoveOrCopyInt() : value{42} { print_default_created(this); }
+    MoveOrCopyInt(int v) : value{v} { print_created(this, value); }
+    MoveOrCopyInt(MoveOrCopyInt &&m) : value{-1} { print_move_created(this, m.value); std::swap(value, m.value); }
     MoveOrCopyInt &operator=(MoveOrCopyInt &&m) { print_move_assigned(this, m.value); std::swap(value, m.value); return *this; }
     MoveOrCopyInt(const MoveOrCopyInt &c) { print_copy_created(this, c.value); value = c.value; }
     MoveOrCopyInt &operator=(const MoveOrCopyInt &c) { print_copy_assigned(this, c.value); value = c.value; return *this; }
@@ -58,18 +56,35 @@ public:
 
     int value;
 };
-class CopyOnlyInt {
-public:
-    CopyOnlyInt() { print_default_created(this); }
-    CopyOnlyInt(int v) : value{std::move(v)} { print_created(this, value); }
+struct CopyOnlyInt {
+    CopyOnlyInt() : value{42} { print_default_created(this); }
+    CopyOnlyInt(int v) : value{v} { print_created(this, value); }
     CopyOnlyInt(const CopyOnlyInt &c) { print_copy_created(this, c.value); value = c.value; }
     CopyOnlyInt &operator=(const CopyOnlyInt &c) { print_copy_assigned(this, c.value); value = c.value; return *this; }
     ~CopyOnlyInt() { print_destroyed(this); }
 
     int value;
 };
+
 PYBIND11_NAMESPACE_BEGIN(pybind11)
 PYBIND11_NAMESPACE_BEGIN(detail)
+
+// validate movable_cast_op_type()
+// copy semantics is explicitly requested by an lvalue reference argument (T&)
+static_assert(std::is_same<movable_cast_op_type<MoveOrCopyInt&>, MoveOrCopyInt&>::value, "lvalue reference requested");
+static_assert(std::is_same<movable_cast_op_type<MoveOnlyInt&>, MoveOnlyInt&>::value, "lvalue reference requested");
+static_assert(std::is_same<movable_cast_op_type<CopyOnlyInt&>, CopyOnlyInt&>::value, "lvalue reference requested");
+
+// move semantics is explicitly requested by an rvalue argument (T&&)
+static_assert(std::is_same<movable_cast_op_type<MoveOrCopyInt&&>, MoveOrCopyInt>::value, "requesting move semantics");
+static_assert(std::is_same<movable_cast_op_type<MoveOnlyInt&&>, MoveOnlyInt>::value, "requesting move semantics");
+static_assert(std::is_same<movable_cast_op_type<CopyOnlyInt&&>, CopyOnlyInt>::value, "requesting move semantics");
+
+// casting type for plain arguments is chose to yield copy semantics by default, but move semantics for move-only types
+static_assert(std::is_same<movable_cast_op_type<MoveOrCopyInt>, MoveOrCopyInt&>::value, "default to copy semantics");
+static_assert(std::is_same<movable_cast_op_type<MoveOnlyInt>, MoveOnlyInt>::value, "only move semantics supported");
+static_assert(std::is_same<movable_cast_op_type<CopyOnlyInt>, CopyOnlyInt&>::value, "copy semantics");
+
 template <> struct type_caster<MoveOnlyInt> {
     PYBIND11_TYPE_CASTER(MoveOnlyInt, _("MoveOnlyInt"));
     bool load(handle src, bool) { value = MoveOnlyInt(src.cast<int>()); return true; }
@@ -113,10 +128,10 @@ TEST_SUBMODULE(copy_move_policies, m) {
     // test_move_and_copy_casts
     m.def("move_and_copy_casts", [](py::object o) {
         int r = 0;
-        r += py::cast<MoveOrCopyInt>(o).value; /* moves */
+        r += py::cast<MoveOrCopyInt>(o).value; /* copies */
         r += py::cast<MoveOnlyInt>(o).value; /* moves */
         r += py::cast<CopyOnlyInt>(o).value; /* copies */
-        auto m1(py::cast<MoveOrCopyInt>(o)); /* moves */
+        auto m1(py::cast<MoveOrCopyInt>(o)); /* copies */
         auto m2(py::cast<MoveOnlyInt>(o)); /* moves */
         auto m3(py::cast<CopyOnlyInt>(o)); /* copies */
         r += m1.value + m2.value + m3.value;
@@ -126,7 +141,8 @@ TEST_SUBMODULE(copy_move_policies, m) {
 
     // test_move_and_copy_loads
     m.def("move_only", [](MoveOnlyInt m) { return m.value; });
-    m.def("move_or_copy", [](MoveOrCopyInt m) { return m.value; });
+    m.def("move", [](MoveOrCopyInt&& m) { return m.value; });
+    m.def("copy", [](MoveOrCopyInt m) { return m.value; });
     m.def("copy_only", [](CopyOnlyInt m) { return m.value; });
     m.def("move_pair", [](std::pair<MoveOnlyInt, MoveOrCopyInt> p) {
         return p.first.value + p.second.value;
@@ -156,18 +172,39 @@ TEST_SUBMODULE(copy_move_policies, m) {
         d["CopyOnlyInt"] = py::cast(co, py::return_value_policy::reference);
         return d;
     });
+
+    // test_move_copy_class_loads: similar tests as above, but with types exposed to python
+    struct MoveOnlyIntC : MoveOnlyInt { using MoveOnlyInt::MoveOnlyInt; };
+    py::class_<MoveOnlyIntC>(m, "MoveOnlyInt")
+        .def(py::init<int>())
+        .def_readonly("value", &MoveOnlyIntC::value)
+        .def_static("move_explicit", [](MoveOnlyIntC&& v) { return v.value; })
+        .def_static("move_implicit", [](MoveOnlyIntC v) { return v.value; })
+        ;
+    struct MoveOrCopyIntC : MoveOrCopyInt { using MoveOrCopyInt::MoveOrCopyInt; };
+    py::class_<MoveOrCopyIntC>(m, "MoveOrCopyInt")
+        .def(py::init<int>())
+        .def_readonly("value", &MoveOrCopyIntC::value)
+        .def_static("copy", [](MoveOrCopyIntC v) { return v.value; })
+        .def_static("move", [](MoveOrCopyIntC&& v) { return v.value; })
+        .def_static("ref", [](const MoveOrCopyIntC& v) { return v.value; })
+        ;
+    struct CopyOnlyIntC : CopyOnlyInt { using CopyOnlyInt::CopyOnlyInt; };
+    py::class_<CopyOnlyIntC>(m, "CopyOnlyInt")
+        .def(py::init<int>())
+        .def_readonly("value", &CopyOnlyIntC::value)
+        .def_static("copy", [](CopyOnlyIntC v) { return v.value; })
+        .def_static("rref", [](CopyOnlyIntC&& v) { return v.value; })
+        .def_static("lref", [](const CopyOnlyIntC& v) { return v.value; })
+        ;
+
 #ifdef PYBIND11_HAS_OPTIONAL
     // test_move_and_copy_load_optional
     m.attr("has_optional") = true;
-    m.def("move_optional", [](std::optional<MoveOnlyInt> o) {
-        return o->value;
-    });
-    m.def("move_or_copy_optional", [](std::optional<MoveOrCopyInt> o) {
-        return o->value;
-    });
-    m.def("copy_optional", [](std::optional<CopyOnlyInt> o) {
-        return o->value;
-    });
+    m.def("move_optional", [](std::optional<MoveOnlyInt> o) { return o->value; });
+    m.def("mc_move_optional", [](std::optional<MoveOrCopyInt>&& o) { return o->value; });
+    m.def("mc_copy_optional", [](std::optional<MoveOrCopyInt> o) { return o->value; });
+    m.def("copy_optional", [](std::optional<CopyOnlyInt> o) { return o->value; });
     m.def("move_optional_tuple", [](std::optional<std::tuple<MoveOrCopyInt, MoveOnlyInt, CopyOnlyInt>> x) {
         return std::get<0>(*x).value + std::get<1>(*x).value + std::get<2>(*x).value;
     });
