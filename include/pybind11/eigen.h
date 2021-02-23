@@ -10,6 +10,7 @@
 #pragma once
 
 #include "numpy.h"
+#include <type_traits>
 
 #if defined(__INTEL_COMPILER)
 #  pragma warning(disable: 1682) // implicit conversion of a 64-bit integral type to a smaller integral type (potential portability problem)
@@ -346,7 +347,9 @@ public:
 
     operator Type*() { return &value; }
     operator Type&() { return value; }
-    operator Type() { return std::move(value); }
+    operator Type&&() { return std::move(value); }
+    template<typename U = Type>
+    operator typename std::enable_if<!std::is_abstract<U>::value, U>::type() { return std::move(value); }
     template <typename T> using cast_op_type = movable_cast_op_type<T>;
 
 private:

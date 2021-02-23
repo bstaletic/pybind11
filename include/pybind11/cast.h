@@ -787,9 +787,9 @@ template <typename T> using cast_op_type_for_moving =
         // this doesn't work for abstract types: cast these to an rvalue reference
         typename std::add_rvalue_reference<intrinsic_t<T>>::type>;
 
-// A plain argument type will use lvalue references (triggering copy semantics)
+// A by-value argument type will use lvalue references (triggering copy semantics)
 // except the type is move-only and thus should use move semantics.
-template <typename T> using cast_op_type_for_plain =
+template <typename T> using cast_op_type_for_byvalue =
     conditional_t<!std::is_copy_constructible<intrinsic_t<T>>::value,
         cast_op_type_for_moving<T>,
         typename std::add_lvalue_reference<intrinsic_t<T>>::type>;
@@ -815,7 +815,7 @@ using movable_cast_op_type =
             cast_op_type_for_moving<T>,
             conditional_t<std::is_lvalue_reference<T>::value,
                 typename std::add_lvalue_reference<intrinsic_t<T>>::type,
-                cast_op_type_for_plain<T> > > >;
+                cast_op_type_for_byvalue<T> > > >;
 
 // std::is_copy_constructible isn't quite enough: it lets std::vector<T> (and similar) through when
 // T is non-copyable, but code containing such a copy constructor fails to actually compile.
@@ -950,10 +950,11 @@ public:
 
     operator itype*() { return (type *) value; }
     operator itype&() { if (!value) throw reference_cast_error(); return *((itype *) value); }
-    // move caster, actually triggering a move construction from value
-    operator itype() { if (!value) throw reference_cast_error(); return std::move(*((itype *) value)); }
     // fallback move caster, just passing rvalue reference as is
     operator itype&&() { if (!value) throw reference_cast_error(); return std::move(*((itype *) value)); }
+    // move caster, actually triggering a move construction from value
+    template<typename U = itype>
+    operator typename std::enable_if<!std::is_abstract<U>::value, U>::type() { if (!value) throw reference_cast_error(); return std::move(*((itype *) value)); }
 
 protected:
     using Constructor = void *(*)(const void *);
@@ -1018,12 +1019,12 @@ public:
     operator std::reference_wrapper<type>() { return cast_op<type &>(subcaster); }
 };
 
-#define PYBIND11_TYPE_CASTER(type, py_name) \
+#define PYBIND11_TYPE_CASTER(type_, py_name) \
     protected: \
-        type value; \
+        type_ value; \
     public: \
         static constexpr auto name = py_name; \
-        template <typename T_, enable_if_t<std::is_same<type, remove_cv_t<T_>>::value, int> = 0> \
+        template <typename T_, enable_if_t<std::is_same<type_, remove_cv_t<T_>>::value, int> = 0> \
         static handle cast(T_ *src, return_value_policy policy, handle parent) { \
             if (!src) return none().release(); \
             if (policy == return_value_policy::take_ownership) { \
@@ -1032,10 +1033,11 @@ public:
                 return cast(*src, policy, parent); \
             } \
         } \
-        operator type*() { return &value; } \
-        operator type&() { return value; } \
-        operator type&&() { return std::move(value); } \
-        operator type() { return std::move(value); } \
+        operator type_*() { return &value; } \
+        operator type_&() { return value; } \
+        operator type_&&() { return std::move(value); } \
+	template<typename U = type_> \
+        operator typename std::enable_if<!std::is_abstract<U>::value, U>::type() { return std::move(value); } \
         template <typename T_> using cast_op_type = pybind11::detail::movable_cast_op_type<T_>
 
 
@@ -1732,19 +1734,19 @@ class type_caster<T, enable_if_t<is_pyobject<T>::value>> : public pyobject_caste
 // - if the type is non-copy-constructible, the object must be the sole owner of the type (i.e. it
 //   must have ref_count() == 1)h
 // If any of the above are not satisfied, we fall back to copying.
-template <typename T> using move_is_plain_type = satisfies_none_of<T,
+template <typename T> using move_is_byvalue_type = satisfies_none_of<T,
     std::is_void, std::is_pointer, std::is_reference, std::is_const
 >;
 template <typename T, typename SFINAE = void> struct move_always : std::false_type {};
 template <typename T> struct move_always<T, enable_if_t<all_of<
-    move_is_plain_type<T>,
+    move_is_byvalue_type<T>,
     negation<is_copy_constructible<T>>,
     std::is_move_constructible<T>,
     std::is_same<decltype(std::declval<make_caster<T>>().operator T&()), T&>
 >::value>> : std::true_type {};
 template <typename T, typename SFINAE = void> struct move_if_unreferenced : std::false_type {};
 template <typename T> struct move_if_unreferenced<T, enable_if_t<all_of<
-    move_is_plain_type<T>,
+    move_is_byvalue_type<T>,
     negation<move_always<T>>,
     std::is_move_constructible<T>,
     std::is_same<decltype(std::declval<make_caster<T>>().operator T&()), T&>
